@@ -70,6 +70,6 @@ server = http.createServer((req, res) ->
     res.end('Internal Server Error')
 )
 
-server.listen(1337, '127.0.0.1', ->
-  console.log('Server running at http://127.0.0.1:1337/')
+server.listen(1337, '0.0.0.0', ->
+  console.log('Server running at http://0.0.0.0:1337/')
 )
