@@ -35,17 +35,27 @@ server = http.createServer((req, res) ->
       http.get(url.parse(targetURL), (imageRes) ->
         console.log('HEADERS: ' + JSON.stringify(imageRes.headers))
 
-        res.writeHead(imageRes.statusCode,
-          'Date': imageRes.headers['date'],
-          'Last-Modified': imageRes.headers['last-modified'],
-          'ETag': imageRes.headers['etag'],
-          'Content-Type': 'image/jpeg'
-        )
-
         if imageRes.statusCode == 200
           image = gm(imageRes, fileName)
           nsConfig.processImage(image)
-          image.stream((err, stdout, stderr) -> stdout.pipe(res))
+
+          image.stream((err, stdout, stderr) ->
+            if err
+              console.log("processing error: #{err}")
+              res.writeHead(500, {
+                'Date': new Date().toUTCString(),
+                'Content-Type': 'text/plain'
+              })
+              res.end(err.message)
+
+            else
+              res.writeHead(imageRes.statusCode,
+                'Date': imageRes.headers['date'],
+                'Last-Modified': imageRes.headers['last-modified'],
+                'ETag': imageRes.headers['etag'],
+                'Content-Type': 'image/jpeg'
+              )
+              stdout.pipe(res))
 
         else
           # res.setEncoding('utf8')
@@ -56,7 +66,10 @@ server = http.createServer((req, res) ->
       ).on('error', (err) ->
         console.log("problem with request: #{err.message}")
         res.writeHead(500)
-        res.end(err.message)
+        res.end(err.message, {
+          'Date': new Date().toUTCString(),
+          'Content-Type': 'text/plain'
+        })
       )
 
     else
