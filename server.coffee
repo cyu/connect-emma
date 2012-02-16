@@ -1,5 +1,3 @@
-require 'coffee-script'
-
 http = require 'http'
 util = require 'util'
 url  = require 'url'
