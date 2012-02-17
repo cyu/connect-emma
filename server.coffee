@@ -1,86 +1,97 @@
-http = require 'http'
-util = require 'util'
-url  = require 'url'
-gm   = require 'gm'
+http    = require 'http'
+url     = require 'url'
+gm      = require 'gm'
+path    = require 'path'
+coffee  = require 'coffee-script'
 
 config = require './config'
 
-server = http.createServer((req, res) ->
-  try
-    console.log("Incoming Request from: #{req.connection.remoteAddress} for href: #{req.url}")
+class Route
+  constructor: (pathname) ->
+    @pathComponents = pathname.split('/')
+    @pathComponents.shift() if @pathComponents[0] == ''
 
-    # pipe some details to the node console
-    urlObj = url.parse(req.url)
+    @namespace = @pathComponents.shift()
 
-    pathComponents = urlObj.pathname.split('/')
-    pathComponents.shift() if pathComponents[0] == ''
+    lastPathComponent = @pathComponents.pop()
+    ext = path.extname(lastPathComponent)
+    @pathComponents.push(path.basename(lastPathComponent, ext))
+    @extension = ext.substring(1, ext.length)
 
-    nsConfig = config.namespaces[pathComponents.shift()]
-    if nsConfig
-      targetURL = nsConfig.urlTemplate
-      fileName = null
-      index = 0
-      while pathComponents.length
-        comp = pathComponents.shift()
-        if pathComponents.length == 0
-          fileName = comp
-          idx = comp.lastIndexOf('.')
-          comp = comp.substring(0, idx) if idx >= 0
-        targetURL = targetURL.replace(new RegExp("\\$#{index + 1}", 'g'), comp)
-        index++
+class Processor
+  constructor: (@ns, @request, @response) ->
 
-      console.log("Fetching image #{targetURL}")
-      http.get(url.parse(targetURL), (imageRes) ->
-        console.log('HEADERS: ' + JSON.stringify(imageRes.headers))
+  fetch: (urlString) ->
+    http.get(url.parse(urlString), (imageResponse) =>
+      console.log('HEADERS: ' + JSON.stringify(imageResponse.headers))
 
-        if imageRes.statusCode == 200
-          image = gm(imageRes, fileName)
-          nsConfig.processImage(image)
+      if imageResponse.statusCode == 200
+        image = gm(imageResponse, path.basename(urlString))
+        @ns.processImage(image)
+        image.stream((err, stdout, stderr) =>
+          if err
+            console.log("[ERR] error processing image: #{err.message}")
+            this.fail(500, err.message)
 
-          image.stream((err, stdout, stderr) ->
-            if err
-              console.log("processing error: #{err}")
-              res.writeHead(500, {
-                'Date': new Date().toUTCString(),
-                'Content-Type': 'text/plain'
-              })
-              res.end(err.message)
+          else
+            headers = coffee.helpers.extend({'Cache-Control': 'public'}, imageResponse.headers)
+            @response.writeHead(imageResponse.statusCode, headers)
+            stdout.pipe(@response)
+        )
 
-            else
-              res.writeHead(imageRes.statusCode,
-                'Date': imageRes.headers['date'],
-                'Last-Modified': imageRes.headers['last-modified'],
-                'ETag': imageRes.headers['etag'],
-                'Content-Type': 'image/jpeg'
-              )
-              stdout.pipe(res))
+      else
+        headers = coffee.helpers.extend({'Cache-Control': 'no-cache'}, imageResponse.headers)
+        @response.writeHead(imageResponse.statusCode, headers)
+        imageResponse.pipe(@response)
+
+    ).on('error', (err) =>
+      console.log("[ERR] error fetching image: #{err.message}")
+      this.fail(500, err.message)
+    )
+
+  fail: (statusCode, message) ->
+    @response.writeHead(statusCode,
+      'Date': new Date().toUTCString()
+      'Content-Type': 'text/plain'
+      'Cache-Control': 'no-cache'
+    )
+    @response.end(err.message)
+
+
+class Emma
+  constructor: ->
+    @server = http.createServer((req, res) =>
+      try
+        console.log("Incoming Request from: #{req.connection.remoteAddress} for href: #{req.url}")
+        route = new Route(url.parse(req.url).pathname)
+
+        if ns = config.namespaces[route.namespace]
+          targetURL = ns.urlTemplate
+
+          for comp, i in route.pathComponents
+            targetURL = targetURL.replace(new RegExp("\\$#{i + 1}", 'g'), comp)
+
+          targetURL = targetURL.replace(/\$extension/g, route.extension)
+
+          console.log("Fetching image #{targetURL}")
+          new Processor(ns, req, res).fetch(targetURL)
 
         else
-          # res.setEncoding('utf8')
-          imageRes.on('data'  , (chunk) -> res.write(chunk))
-          imageRes.on('end'   , -> res.end())
-          imageRes.on('close' , -> res.end())
+          res.writeHead(404,
+            'Cache-Control': 'no-cache'
+          )
+          res.end('Not Found')
 
-      ).on('error', (err) ->
-        console.log("problem with request: #{err.message}")
-        res.writeHead(500)
-        res.end(err.message, {
-          'Date': new Date().toUTCString(),
-          'Content-Type': 'text/plain'
-        })
-      )
+      catch err
+        console.log("[ERR] #{err.message}")
+        res.writeHead(500,
+          'Cache-Control': 'no-cache'
+        )
+        res.end('Internal Server Error')
+    )
+  start: (host, port) ->
+    @server.listen(port, host, -> console.log("Server running at http://#{host}:#{port}/"))
 
-    else
-      res.writeHead(404)
-      res.end('Not Found')
+exports.server = new Emma()
+exports.server.start('0.0.0.0', 1337)
 
-  catch err
-    # handle errors gracefully
-    util.puts(err)
-    res.writeHead(500)
-    res.end('Internal Server Error')
-)
-
-server.listen(1337, '0.0.0.0', ->
-  console.log('Server running at http://0.0.0.0:1337/')
-)
