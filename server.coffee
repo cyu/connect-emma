@@ -35,7 +35,7 @@ class Processor
             this.fail(500, err.message)
 
           else
-            headers = coffee.helpers.extend({'Cache-Control': 'public'}, imageResponse.headers)
+            headers = coffee.helpers.extend({}, imageResponse.headers)
             delete headers['content-length']
             if @ns.cacheExpiration?
               headers['Expires'] = new Date(new Date().getTime() + (@ns.cacheExpiration * 1000)).toUTCString()
