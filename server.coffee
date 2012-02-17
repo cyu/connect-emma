@@ -18,6 +18,7 @@ class Route
     @pathComponents.push(path.basename(lastPathComponent, ext))
     @extension = ext.substring(1, ext.length)
 
+
 class Processor
   constructor: (@ns, @request, @response) ->
 
@@ -36,6 +37,9 @@ class Processor
           else
             headers = coffee.helpers.extend({'Cache-Control': 'public'}, imageResponse.headers)
             delete headers['content-length']
+            if @ns.cacheExpiration?
+              headers['Expires'] = new Date(new Date().getTime() + (@ns.cacheExpiration * 1000)).toUTCString()
+
             @response.writeHead(imageResponse.statusCode, headers)
             stdout.pipe(@response)
         )
