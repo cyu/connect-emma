@@ -35,6 +35,7 @@ class Processor
 
           else
             headers = coffee.helpers.extend({'Cache-Control': 'public'}, imageResponse.headers)
+            delete headers['content-length']
             @response.writeHead(imageResponse.statusCode, headers)
             stdout.pipe(@response)
         )
