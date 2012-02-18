@@ -1,10 +1,7 @@
-http    = require 'http'
-url     = require 'url'
-gm      = require 'gm'
-path    = require 'path'
-coffee  = require 'coffee-script'
-
-config = require './config'
+http = require 'http'
+url  = require 'url'
+path = require 'path'
+gm   = require 'gm'
 
 class Route
   constructor: (pathname) ->
@@ -18,14 +15,11 @@ class Route
     @pathComponents.push(path.basename(lastPathComponent, ext))
     @extension = ext.substring(1, ext.length)
 
-
 class Processor
   constructor: (@ns, @request, @response) ->
 
   fetch: (urlString) ->
     http.get(url.parse(urlString), (imageResponse) =>
-      console.log('HEADERS: ' + JSON.stringify(imageResponse.headers))
-
       if imageResponse.statusCode == 200
         image = gm(imageResponse, path.basename(urlString))
         @ns.processImage(image)
@@ -35,8 +29,11 @@ class Processor
             this.fail(500, err.message)
 
           else
-            headers = coffee.helpers.extend({}, imageResponse.headers)
-            delete headers['content-length']
+            headers =
+              'Date': new Date().toUTCString()
+              'Content-Type': imageResponse.headers['content-type']
+              'Last-Modified': imageResponse.headers['last-modified']
+
             if @ns.cacheExpiration?
               headers['Expires'] = new Date(new Date().getTime() + (@ns.cacheExpiration * 1000)).toUTCString()
 
@@ -45,7 +42,11 @@ class Processor
         )
 
       else
-        headers = coffee.helpers.extend({'Cache-Control': 'no-cache'}, imageResponse.headers)
+        headers =
+          'Date': new Date().toUTCString()
+          'Content-Type': imageResponse.headers['content-type']
+          'Cache-Control': 'no-cache'
+
         @response.writeHead(imageResponse.statusCode, headers)
         imageResponse.pipe(@response)
 
@@ -62,41 +63,20 @@ class Processor
     )
     @response.end(err.message)
 
+module.exports = (options) ->
+  (req, res, next) ->
+    route = new Route(url.parse(req.url).pathname)
 
-class Emma
-  constructor: ->
-    @server = http.createServer((req, res) =>
-      try
-        console.log("Incoming Request from: #{req.connection.remoteAddress} for href: #{req.url}")
-        route = new Route(url.parse(req.url).pathname)
+    if ns = options.namespaces[route.namespace]
+      targetURL = ns.urlTemplate
 
-        if ns = config.namespaces[route.namespace]
-          targetURL = ns.urlTemplate
+      for comp, i in route.pathComponents
+        targetURL = targetURL.replace(new RegExp("\\$#{i + 1}", 'g'), comp)
 
-          for comp, i in route.pathComponents
-            targetURL = targetURL.replace(new RegExp("\\$#{i + 1}", 'g'), comp)
+      targetURL = targetURL.replace(/\$extension/g, route.extension)
 
-          targetURL = targetURL.replace(/\$extension/g, route.extension)
+      new Processor(ns, req, res).fetch(targetURL)
 
-          console.log("Fetching image #{targetURL}")
-          new Processor(ns, req, res).fetch(targetURL)
-
-        else
-          res.writeHead(404,
-            'Cache-Control': 'no-cache'
-          )
-          res.end('Not Found')
-
-      catch err
-        console.log("[ERR] #{err.message}")
-        res.writeHead(500,
-          'Cache-Control': 'no-cache'
-        )
-        res.end('Internal Server Error')
-    )
-  start: (host, port) ->
-    @server.listen(port, host, -> console.log("Server running at http://#{host}:#{port}/"))
-
-exports.server = new Emma()
-exports.server.start('0.0.0.0', 1337)
-
+    else
+      next()
+  
