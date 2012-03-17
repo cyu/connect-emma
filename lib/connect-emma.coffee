@@ -32,6 +32,7 @@ class Processor
           this.processImage(imageResponse, urlString)
         else
           this.sendSourceError(imageResponse)
+
       catch err
         console.log("[ERR] error serving image: #{err.message}")
         this.failWithError(err);
@@ -39,6 +40,13 @@ class Processor
     ).on('error', (err) =>
       console.log("[ERR] error fetching image: #{err.message}")
       this.failWithError(err)
+
+    ).on('close', (err) =>
+      console.log("[ERR] error fetching image: #{err.message}")
+      this.failWithError(err)
+
+    ).on('socket', (socket) ->
+      socket.setTimeout(@ns.timeout) if @ns.timeout?
     )
 
   processImage: (imageData, imageURL) ->
