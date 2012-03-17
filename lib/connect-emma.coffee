@@ -19,41 +19,59 @@ class Processor
   constructor: (@ns, @request, @response) ->
 
   fetch: (urlString) ->
+    try
+      this.doFetch(urlString)
+    catch err
+      console.log("[ERR] error fetching image: #{err.message}")
+      this.failWithError(err)
+
+  doFetch: (urlString) ->
     http.get(url.parse(urlString), (imageResponse) =>
-      if imageResponse.statusCode == 200
-        image = gm(imageResponse, path.basename(urlString))
-        @ns.processImage(image)
-        image.stream((err, stdout, stderr) =>
-          if err
-            console.log("[ERR] error processing image: #{err.message}")
-            this.fail(500, err.message)
+      try
+        if imageResponse.statusCode == 200
+          this.processImage(imageResponse, urlString)
+        else
+          this.sendSourceError(imageResponse)
+      catch err
+        console.log("[ERR] error serving image: #{err.message}")
+        this.failWithError(err);
 
-          else
-            headers =
-              'Date': new Date().toUTCString()
-              'Content-Type': imageResponse.headers['content-type']
-              'Last-Modified': imageResponse.headers['last-modified']
+    ).on('error', (err) =>
+      console.log("[ERR] error fetching image: #{err.message}")
+      this.failWithError(err)
+    )
 
-            if @ns.cacheExpiration?
-              headers['Expires'] = new Date(new Date().getTime() + (@ns.cacheExpiration * 1000)).toUTCString()
-
-            @response.writeHead(imageResponse.statusCode, headers)
-            stdout.pipe(@response)
-        )
+  processImage: (imageData, imageURL) ->
+    image = gm(imageData, path.basename(imageURL))
+    @ns.processImage(image)
+    image.stream((err, stdout, stderr) =>
+      if err
+        console.log("[ERR] error processing image: #{err.message}")
+        this.failWithError(err)
 
       else
         headers =
           'Date': new Date().toUTCString()
-          'Content-Type': imageResponse.headers['content-type']
-          'Cache-Control': 'no-cache'
+          'Content-Type': imageData.headers['content-type']
+          'Last-Modified': imageData.headers['last-modified']
 
-        @response.writeHead(imageResponse.statusCode, headers)
-        imageResponse.pipe(@response)
+        if @ns.cacheExpiration?
+          headers['Expires'] = new Date(new Date().getTime() + (@ns.cacheExpiration * 1000)).toUTCString()
 
-    ).on('error', (err) =>
-      console.log("[ERR] error fetching image: #{err.message}")
-      this.fail(500, err.message)
+        @response.writeHead(imageData.statusCode, headers)
+        stdout.pipe(@response)
     )
+
+  sendSourceError: (sourceResponse) ->
+    headers =
+      'Date': new Date().toUTCString()
+      'Content-Type': sourceResponse.headers['content-type']
+      'Cache-Control': 'no-cache'
+
+    @response.writeHead(sourceResponse.statusCode, headers)
+    sourceResponse.pipe(@response)
+
+  failWithError: (err) -> this.fail(500, err.message)
 
   fail: (statusCode, message) ->
     @response.writeHead(statusCode,
