@@ -1,7 +1,8 @@
-http = require 'http'
-url  = require 'url'
-path = require 'path'
-gm   = require 'gm'
+http  = require 'http'
+https = require 'https'
+url   = require 'url'
+path  = require 'path'
+gm    = require 'gm'
 
 class Route
   constructor: (pathname) ->
@@ -26,7 +27,8 @@ class Processor
       this.failWithError(err)
 
   doFetch: (urlString) ->
-    http.get(url.parse(urlString), (imageResponse) =>
+    protocol = if (0 == urlString.indexOf('https')) then https else http
+    protocol.get(url.parse(urlString), (imageResponse) =>
       try
         if imageResponse.statusCode == 200
           this.processImage(imageResponse, urlString)
@@ -41,11 +43,11 @@ class Processor
       console.log("[ERR] error fetching image: #{err.message}")
       this.failWithError(err)
 
-    ).on('close', (err) =>
-      console.log("[ERR] error fetching image: #{err.message}")
-      this.failWithError(err)
+    ).on('close', =>
+      console.log("[ERR] connection closed")
+      this.fail(500, 'Connection closed')
 
-    ).on('socket', (socket) ->
+    ).on('socket', (socket) =>
       socket.setTimeout(@ns.timeout) if @ns.timeout?
     )
 
@@ -87,7 +89,7 @@ class Processor
       'Content-Type': 'text/plain'
       'Cache-Control': 'no-cache'
     )
-    @response.end(err.message)
+    @response.end(message)
 
 module.exports = (options) ->
   (req, res, next) ->
