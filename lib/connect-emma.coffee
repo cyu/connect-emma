@@ -53,7 +53,7 @@ class Processor
 
   processImage: (imageData, imageURL) ->
     image = gm(imageData, path.basename(imageURL))
-    @ns.processImage(image)
+    @ns.processImage(image, @request)
     image.stream((err, stdout, stderr) =>
       if err
         console.log("[ERR] error processing image: #{err.message}")
