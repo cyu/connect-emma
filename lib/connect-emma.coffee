@@ -103,6 +103,13 @@ module.exports = (options) ->
 
       targetURL = targetURL.replace(/\$extension/g, route.extension)
 
+      # Store config options into the request for use by processimage scripts
+      req.emma = {
+        pathComponents: route.pathComponents
+        extension: route.extension
+        targetURL: targetURL
+      }
+
       new Processor(ns, req, res).fetch(targetURL)
 
     else
