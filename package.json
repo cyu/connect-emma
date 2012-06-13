@@ -1,7 +1,7 @@
 {
   "name": "connect-emma",
   "description": "Connect middleware for proxying & transforming images",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": "Calvin Yu <calvin@scoutmob.com>",
   "dependencies": { "gm": ">= 1.0.4" },
   "main": "./lib/connect-emma.js"
