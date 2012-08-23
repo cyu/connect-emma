@@ -30,16 +30,20 @@ class Route
 
 
 class Namespace
-  constructor: (@config) ->
+  constructor: (@name, @config) ->
     if @config.namespaces?
       @namespaces = {}
+    else if @config.defaults?
+      defaults = @config.defaults
+      delete @config.defaults
+      @config = merge(defaults, @config)
 
   ns: (name) ->
     unless ns = @namespaces[name]
       if nsConfig = @config.namespaces[name]
         if @config.defaults?
-          nsConfig = merge(@config.defaults, nsConfig)
-        @namespaces[name] = ns = new Namespace(nsConfig)
+          nsConfig.defaults = merge(@config.defaults, nsConfig.defaults || {})
+        @namespaces[name] = ns = new Namespace(name, nsConfig)
     ns
 
   process: (route, req, res, next) ->
@@ -139,7 +143,7 @@ class Processor
     @response.end(message)
 
 module.exports = (options) ->
-  rootNamespace = new Namespace(options)
+  rootNamespace = new Namespace('root', options)
   (req, res, next) ->
     route = new Route(url.parse(req.url).pathname)
     rootNamespace.process(route, req, res, next)
