@@ -4,5 +4,9 @@
   "version": "0.1.4",
   "author": "Calvin Yu <calvin@scoutmob.com>",
   "dependencies": { "gm": ">= 1.0.4" },
-  "main": "./lib/connect-emma.js"
+  "main": "./lib/connect-emma.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Scoutmob/connect-emma"
+  }
 }
