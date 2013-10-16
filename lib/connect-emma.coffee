@@ -118,6 +118,7 @@ class Processor
 
         if @ns.cacheExpiration?
           headers['Expires'] = new Date(new Date().getTime() + (@ns.cacheExpiration * 1000)).toUTCString()
+          headers['Cache-Control'] = "public, max-age=#{@ns.cacheExpiration}"
 
         @response.writeHead(imageData.statusCode, headers)
         stdout.pipe(@response)
