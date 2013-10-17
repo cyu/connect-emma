@@ -103,26 +103,46 @@ class Processor
     )
 
   processImage: (imageData, imageURL) ->
-    image = gm(imageData, path.basename(imageURL))
-    @ns.processImage(image, @request)
-    image.stream((err, stdout, stderr) =>
-      if err
-        console.log("[ERR] error processing image: #{err.message}")
-        this.failWithError(err)
+    contentType  = imageData.headers['content-type']
+    lastModified = imageData.headers['last-modified']
+    statusCode   = imageData.statusCode
+    queue        = @ns.processImage
 
-      else
-        headers =
-          'Date': new Date().toUTCString()
-          'Content-Type': imageData.headers['content-type']
-          'Last-Modified': imageData.headers['last-modified']
+    if typeof queue == 'function'
+      queue = [queue]
+    else
+      queue = queue.slice() # Clone a copy
 
-        if @ns.cacheExpiration?
-          headers['Expires'] = new Date(new Date().getTime() + (@ns.cacheExpiration * 1000)).toUTCString()
-          headers['Cache-Control'] = "public, max-age=#{@ns.cacheExpiration}"
+    # Helper method to recursively chain the queued methods
+    _processImage = (steps, imageData, imageURL) =>
+      image = gm(imageData, path.basename(imageURL))
 
-        @response.writeHead(imageData.statusCode, headers)
-        stdout.pipe(@response)
-    )
+      if step = steps.shift()
+        step(image, @request)
+
+      image.stream (err, stdout, stderr) =>
+        if err
+          console.log("[ERR] error processing image: #{err.message}")
+          this.failWithError(err)
+
+        else
+
+          if steps.length > 0 # Stream to the next step
+            _processImage(steps, stdout, imageURL)
+
+          else # Stream to the output
+            headers =
+              'Date': new Date().toUTCString()
+              'Content-Type': contentType
+              'Last-Modified': lastModified
+
+            if @ns.cacheExpiration?
+              headers['Expires'] = new Date(new Date().getTime() + (@ns.cacheExpiration * 1000)).toUTCString()
+              headers['Cache-Control'] = "public, max-age=#{@ns.cacheExpiration}"
+
+            @response.writeHead(statusCode, headers)
+            stdout.pipe(@response)
+    _processImage(queue, imageData, imageURL)
 
   sendSourceError: (sourceResponse) ->
     headers =
