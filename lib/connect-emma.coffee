@@ -88,7 +88,7 @@ class Processor
 
       catch err
         console.log("[ERR] error serving image: #{err.message}")
-        this.failWithError(err);
+        this.failWithError(err)
 
     ).on('error', (err) =>
       console.log("[ERR] error fetching image: #{err.message}")
@@ -164,8 +164,11 @@ class Processor
     @response.end(message)
 
 module.exports = (options) ->
+  if options.gmPrototype?
+    extend(gm.prototype, options.gmPrototype)
+    delete options.gmPrototype
+
   rootNamespace = new Namespace('root', options)
   (req, res, next) ->
     route = new Route(url.parse(req.url).pathname)
     rootNamespace.process(route, req, res, next)
-
