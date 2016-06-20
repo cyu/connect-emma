@@ -1,12 +1,30 @@
 {
   "name": "connect-emma",
+  "version": "1.0.0",
   "description": "Connect middleware for proxying & transforming images",
-  "version": "0.1.6",
-  "author": "Calvin Yu <calvin@scoutmob.com>",
-  "dependencies": { "gm": ">= 1.0.4" },
   "main": "./lib/connect-emma.js",
+  "scripts": {
+    "compile": "babel --presets es2015,stage-0 -d lib/ src/",
+    "prepublish": "npm run compile"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Scoutmob/connect-emma"
+    "url": "https://github.com/cyu/connect-emma"
+  },
+  "author": "Calvin Yu <me@sourcbender.com>",
+  "license": "MIT",
+  "dependencies": {
+    "connect": "^3.4.1",
+    "gm": ">= 1.0.4"
+  },
+  "bugs": {
+    "url": "https://github.com/cyu/connect-emma/issues"
+  },
+  "homepage": "https://github.com/cyu/connect-emma#readme",
+  "devDependencies": {
+    "babel-cli": "^6.10.1",
+    "babel-preset-es2015": "^6.9.0",
+    "babel-preset-stage-0": "^6.5.0",
+    "express": "^4.14.0"
   }
 }
