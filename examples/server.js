@@ -41,5 +41,6 @@ console.log('Server started on port ' + port);
 console.log('See a transformed image here:');
 console.log('   http://localhost:' + port + '/test/lighthouse.jpg');
 console.log('   http://localhost:' + port + '/test/320/320/lighthouse.jpg');
+console.log('   http://localhost:' + port + '/test/crop/640/320/lighthouse.jpg');
 console.log('See the original image here: http://localhost:' + port + '/images/lighthouse.jpg');
 
