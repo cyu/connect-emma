@@ -41,10 +41,8 @@ class Processor {
     }
   }
 
-  process(req, res) {
-    let context = {};
-    context.request = req;
-    context.params = this.route.extractParameters(req);
+  process(context, res) {
+    context.params = this.route.extractParameters(context.request);
 
     log('params: %o', context.params);
 

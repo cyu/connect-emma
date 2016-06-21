@@ -8,8 +8,9 @@ import debug from 'debug';
 let log = debug("emma:log");
 
 class Emma {
-  constructor(processors) {
+  constructor(processors, helpers) {
     this.processors = processors;
+    this.helpers = helpers;
   }
 
   process(req, res, next) {
@@ -17,7 +18,16 @@ class Emma {
     for (let processor of this.processors) {
       if (processor.route.accept(req)) {
         log("selected processor: %s", processor.route.routeString);
-        processor.process(req, res);
+
+        let context = {};
+        context.request = req;
+
+        if (this.helpers) {
+          log('adding helper to context: %o', this.helpers);
+          context.__proto__ = this.helpers;
+        }
+
+        processor.process(context, res);
         found = true;
         break;
       }
@@ -31,6 +41,7 @@ class Emma {
 class Builder {
   constructor() {
     this.processors = [];
+    this.helpers = null;
   }
 
   process(route, urlTemplate) {
@@ -51,8 +62,12 @@ class Builder {
     return this;
   }
 
+  helper(helperObj) {
+    this.helpers = Object.assign(this.helpers || {}, helperObj);
+  }
+
   buildMiddleware() {
-    let emma = new Emma(this.processors);
+    let emma = new Emma(this.processors, this.helpers);
     return function(req, res, next) {
       emma.process(req, res, next);
     }
