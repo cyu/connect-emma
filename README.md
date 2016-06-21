@@ -5,4 +5,4 @@ Emma is a connect middleware that will proxy images from an origin server while 
 
 Emma uses the gm package, which is a node.js library for GraphicsMagick.  Read more about what it can do here: http://aheckmann.github.com/gm/
 
-Take a look at the example to see what it can do: https://github.com/Scoutmob/connect-emma/blob/master/examples/server.coffee
+Take a look at the example to see what it can do: https://github.com/cyu/connect-emma/blob/master/examples/server.js
