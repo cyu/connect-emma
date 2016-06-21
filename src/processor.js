@@ -4,6 +4,7 @@ import url from 'url';
 import path from 'path';
 import gm from 'gm';
 import debug from 'debug';
+import Promise from 'promise';
 
 let log   = debug('emma:log');
 let error = debug('emma:error');
@@ -61,8 +62,8 @@ class Processor {
       }
 
     }).on('error', function(err) {
-      error("error fetching image: %s", err.message);
-      failResponse(res, err);
+      error("error fetching image: %o", err);
+      failResponse(res, err.message);
 
     }).on('socket', function(socket) {
       if (socketTimeout) {
@@ -72,14 +73,31 @@ class Processor {
   }
 
   processImage(image, context, res) {
-    this.processFunc(image, context);
+    image = this.processFunc(image, context);
+    if (('constructor' in image) && image.constructor == Promise) {
+      log('handling process image promise...');
+      let proc = this;
+      image.then(function(image) {
+        log('promise resolved');
+        proc.streamImage(image, context, res);
+      }).catch(function(err) {
+        error("error in process function: %o", err);
+        failResponse(res, err.message);
+      });
+    } else {
+      this.streamImage(image, context, res);
+    }
+  }
+
+  streamImage(image, context, res) {
     let cacheExpiration = this.cacheExpiration;
     image.stream(function(err, stdout, stderr) {
       if (err) {
-        error("error processing image: %s", err.message);
-        failResponse(res, err);
+        error("error processing image: %o", err);
+        failResponse(res, err.message);
 
       } else {
+        log('sending transformed image...');
         let headers = {
           'Date': new Date().toUTCString(),
           'Content-Type': context.imageContentType,

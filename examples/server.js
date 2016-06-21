@@ -1,6 +1,7 @@
 var connect = require('connect');
 var express = require('express');
 var http    = require('http');
+var Promise = require('promise');
 var emma    = require('../lib/connect-emma');
 
 var port = process.env.PORT || 8888;
@@ -19,6 +20,16 @@ images.process(
     imageUrlTemplate,
     function(image, context) {
       return image.resize(context.params.width, context.params.height);
+    });
+images.process(
+    "/test/crop/:width/:height/:filename",
+    imageUrlTemplate,
+    function(image, context) {
+      return new Promise(function(resolve, reject) {
+        var w = Number(context.params.width);
+        var h = Number(context.params.height);
+        resolve(image.gravity('Center').crop(w,h));
+      });
     });
 
 app = connect().
