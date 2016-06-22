@@ -2,9 +2,7 @@
 
 import url from 'url';
 import querystring from 'querystring';
-import debug from 'debug';
-
-let log = debug('emma:log');
+import {log,error} from './utils';
 
 let variable = function(variableName) {
   return function(comp, store) {

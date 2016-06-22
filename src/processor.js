@@ -3,11 +3,8 @@
 import url from 'url';
 import path from 'path';
 import gm from 'gm';
-import debug from 'debug';
 import Promise from 'promise';
-
-let log   = debug('emma:log');
-let error = debug('emma:error');
+import {log,error} from './utils';
 
 function headers(contentType) {
   let extraHeaders = arguments.length > 1 ? arguments[1] : {};

@@ -3,9 +3,7 @@
 import Processor from './processor';
 import Route from './route';
 import ImageSource from './image_source';
-import debug from 'debug';
-
-let log = debug("emma:log");
+import {log,error} from './utils';
 
 let contextHelpers = {
   addCleanup: function(cleanupFunc) {

@@ -1,11 +1,9 @@
 "use strict";
 
-import http  from 'http';
+import http from 'http';
 import https from 'https';
-import url   from 'url';
-import debug from 'debug';
-
-let log = debug("emma:log");
+import url from 'url';
+import {log,error} from './utils';
 
 class ImageSource {
   constructor(urlTemplate) {
