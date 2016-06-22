@@ -9,12 +9,21 @@ import Promise from 'promise';
 let log   = debug('emma:log');
 let error = debug('emma:error');
 
+function headers(contentType) {
+  let extraHeaders = arguments.length > 1 ? arguments[1] : {};
+  return Object.assign({
+    'Date': dateHeaderValue(new Date()),
+    'Content-Type': contentType
+  }, extraHeaders);
+}
+
+function dateHeaderValue(dt) {
+  return dt.toUTCString();
+}
+
 function handleFailedImageResponse(imageResponse, res) {
-  res.writeHead(imageResponse.statusCode, {
-    'Date': new Date().toUTCString(),
-    'Content-Type': imageResponse.headers['content-type'],
-    'Cache-Control': 'no-cache'
-  });
+  let h = headers(imageResponse.headers['content-type'], {'Cache-Control': 'no-cache'});
+  res.writeHead(imageResponse.statusCode, h);
   imageResponse.on('error', function(err) {
     error('handleFailedImageResponse imageResponse stream error: %o', err);
     try { imageResponse.close(); } catch(e) {}
@@ -24,11 +33,7 @@ function handleFailedImageResponse(imageResponse, res) {
 }
 
 function failResponse(res, message) {
-  res.writeHead(500, {
-    'Date': new Date().toUTCString(),
-    'Content-Type': 'text/plain',
-    'Cache-Control': 'no-cache'
-  });
+  res.writeHead(500, headers('text/plain', {'Cache-Control': 'no-cache'}));
   res.end(message);
 }
 
@@ -143,20 +148,14 @@ class Processor {
   }
 
   _pipeStreamToResponse(stream, context, res) {
-    let cacheExpiration = this.cacheExpiration;
     log('sending transformed image...');
-    let headers = {
-      'Date': new Date().toUTCString(),
-      'Content-Type': context.imageContentType,
-      'Last-Modified': context.imageLastModified
-    };
-
+    let cacheExpiration = this.cacheExpiration;
+    let h = headers(context.imageContentType, {'Last-Modified': context.imageLastModified});
     if (cacheExpiration) {
-      headers['Expires'] = new Date(new Date().getTime() + (cacheExpiration*1000)).toUTCString();
-      headers['Cache-Control'] = "public, max-age=" + cacheExpiration;
+      h['Expires'] = dateHeaderValue(new Date(new Date().getTime() + (cacheExpiration*1000)));
+      h['Cache-Control'] = "public, max-age=" + cacheExpiration;
     }
-
-    res.writeHead(200, headers);
+    res.writeHead(200, h);
     return this._pipeStream(stream, res).
       catch(function(err) {
         failResponse(res, err.message);
