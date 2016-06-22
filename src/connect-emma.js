@@ -7,10 +7,24 @@ import debug from 'debug';
 
 let log = debug("emma:log");
 
+let contextHelpers = {
+  addCleanup: function(cleanupFunc) {
+    if (this._cleanupFunctions) {
+      this._cleanupFunctions.push(cleanupFunc);
+    } else {
+      this._cleanupFunctions = [cleanupFunc];
+    }
+  }
+}
+
 class Emma {
   constructor(processors, helpers) {
     this.processors = processors;
-    this.helpers = helpers;
+    if (helpers) {
+      this.helpers = Object.assign(contextHelpers, helpers);
+    } else {
+      this.helpers = contextHelpers;
+    }
   }
 
   process(req, res, next) {

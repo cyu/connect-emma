@@ -24,6 +24,9 @@ images.process(
     "/test/:width/:height/:filename",
     imageUrlTemplate,
     function(image, context) {
+      context.addCleanup(function() {
+        console.log('cleaning up');
+      });
       return image.resize(context.params.width, context.params.height);
     });
 images.process(

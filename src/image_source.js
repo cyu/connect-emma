@@ -18,7 +18,6 @@ class ImageSource {
     });
 
     log('image url: %s', imageUrl);
-
     context.imageUrl = imageUrl;
 
     let protocol = http;

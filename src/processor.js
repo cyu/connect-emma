@@ -15,6 +15,11 @@ function handleFailedImageResponse(imageResponse, res) {
     'Content-Type': imageResponse.headers['content-type'],
     'Cache-Control': 'no-cache'
   });
+  imageResponse.on('error', function(err) {
+    error('handleFailedImageResponse imageResponse stream error: %o', err);
+    try { imageResponse.close(); } catch(e) {}
+    res.end();
+  });
   imageResponse.pipe(res);
 }
 
@@ -43,73 +48,134 @@ class Processor {
 
   process(context, res) {
     context.params = this.route.extractParameters(context.request);
-
     log('params: %o', context.params);
-
-    let proc = this;
-    let socketTimeout = this.socketTimeout;
-
-    this.imageSource.getImage(context, function(imageResponse) {
-      if (imageResponse.statusCode != 200) {
-        handleFailedImageResponse(imageResponse, res);
-      } else {
-        context.imageContentType = imageResponse.headers['content-type'];
-        context.imageLastModified = imageResponse.headers['last-modified'];
-        let image = gm(imageResponse, path.basename(context.imageUrl));
-        proc.processImage(image, context, res);
-      }
-
-    }).on('error', function(err) {
-      error("error fetching image: %o", err);
-      failResponse(res, err.message);
-
-    }).on('socket', function(socket) {
-      if (socketTimeout) {
-        socket.setTimeout(socketTimeout);
-      }
-    });
+    return this._getImage(context, res).
+      then( (image) => this.processImage(image, context, res) ).
+      then( (image) => this._streamImage(image, context, res) ).
+      then(function() {
+        if (context._cleanupFunctions) {
+          for (let i = 0, len = context._cleanupFunctions.length; i < len; i++) {
+            let func = context._cleanupFunctions[0];
+            log('performing cleanup: %o', func);
+            func();
+          }
+        }
+      });
   }
 
   processImage(image, context, res) {
-    image = this.processFunc(image, context);
-    if (('constructor' in image) && image.constructor == Promise) {
-      log('handling process image promise...');
-      let proc = this;
-      image.then(function(image) {
-        log('promise resolved');
-        proc.streamImage(image, context, res);
-      }).catch(function(err) {
+    return this._executeProcessFunction(image, context).
+      catch(function(err) {
         error("error in process function: %o", err);
         failResponse(res, err.message);
       });
-    } else {
-      this.streamImage(image, context, res);
-    }
   }
 
-  streamImage(image, context, res) {
-    let cacheExpiration = this.cacheExpiration;
-    image.stream(function(err, stdout, stderr) {
-      if (err) {
+  _getImage(context, res) {
+    return this._requestImage(context).
+      then(function(imageResponse) {
+        if (imageResponse.statusCode != 200) {
+          handleFailedImageResponse(imageResponse, res);
+          return Promise.reject(new Error("Unexpected HTTP response code: " + imageResponse.statusCode));
+        } else {
+          context.imageContentType = imageResponse.headers['content-type'];
+          context.imageLastModified = imageResponse.headers['last-modified'];
+          log("received image: %s", context.imageContentType);
+          return gm(imageResponse, path.basename(context.imageUrl));
+        }
+      }, function(err) {
+        error("error fetching image: %o", err);
+        failResponse(res, err.message);
+      });
+  }
+
+  _requestImage(context) {
+    log('requesting image...');
+    let proc = this;
+    let socketTimeout = this.socketTimeout;
+    return new Promise(function(resolve, reject) {
+      proc.imageSource.getImage(context, function(imageResponse) {
+        resolve(imageResponse);
+      }).on('error', function(err) {
+        reject(err);
+      }).on('socket', function(socket) {
+        if (socketTimeout) {
+          socket.setTimeout(socketTimeout);
+        }
+      });
+    });
+  }
+
+  _executeProcessFunction(image, context) {
+    let promise = null;
+    try {
+      log('executing process image function...');
+      let result = this.processFunc(image, context);
+      promise = (('constructor' in result) && result.constructor == Promise) ? result : Promise.resolve(result);
+    } catch(err) {
+      promise = Promise.reject(err);
+    }
+    return promise;
+  }
+
+  _streamImage(image, context, res) {
+    log('streaming processed image...');
+    let proc = this;
+    return this._createImageStream(image, context).
+      then(function(stream) {
+        return proc._pipeStreamToResponse(stream, context, res);
+      }, function(err) {
         error("error processing image: %o", err);
         failResponse(res, err.message);
+      });
+  }
 
-      } else {
-        log('sending transformed image...');
-        let headers = {
-          'Date': new Date().toUTCString(),
-          'Content-Type': context.imageContentType,
-          'Last-Modified': context.imageLastModified
-        };
-
-        if (cacheExpiration) {
-          headers['Expires'] = new Date(new Date().getTime() + (cacheExpiration*1000)).toUTCString();
-          headers['Cache-Control'] = "public, max-age=" + cacheExpiration;
+  _createImageStream(image, context) {
+    return new Promise(function(resolve, reject) {
+      image.stream(function(err, stdout, stderr) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(stdout);
         }
+      });
+    });
+  }
 
-        res.writeHead(200, headers);
-        stdout.pipe(res);
-      }
+  _pipeStreamToResponse(stream, context, res) {
+    let cacheExpiration = this.cacheExpiration;
+    log('sending transformed image...');
+    let headers = {
+      'Date': new Date().toUTCString(),
+      'Content-Type': context.imageContentType,
+      'Last-Modified': context.imageLastModified
+    };
+
+    if (cacheExpiration) {
+      headers['Expires'] = new Date(new Date().getTime() + (cacheExpiration*1000)).toUTCString();
+      headers['Cache-Control'] = "public, max-age=" + cacheExpiration;
+    }
+
+    res.writeHead(200, headers);
+    return this._pipeStream(stream, res).
+      catch(function(err) {
+        failResponse(res, err.message);
+        res.end();
+      });
+  }
+
+  _pipeStream(a,b) {
+    return new Promise(function(resolve, reject) {
+      let streamError = false;
+      a.on('finish', function() {
+          if (!streamError) { resolve(); }
+        }).
+        on('error', function(err) {
+          streamError = true;
+          reject(err);
+          try { a.close(); } catch(e) {}
+        });
+      a.pipe(b);
     });
   }
 }
