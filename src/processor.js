@@ -113,7 +113,13 @@ class Processor {
     try {
       log('executing process image function...');
       let result = this.processFunc(image, context);
-      promise = (('constructor' in result) && result.constructor == Promise) ? result : Promise.resolve(result);
+      if (result == null || typeof result == 'undefined') {
+        promise = Promise.reject(new Error('Expecting promise or image as result of process function'));
+      } else if (('constructor' in result) && result.constructor == Promise) {
+        promise = result;
+      } else {
+        promise = Promise.resolve(result);
+      }
     } catch(err) {
       promise = Promise.reject(err);
     }
