@@ -70,6 +70,7 @@ class Processor {
       catch(function(err) {
         error("error in process function: %o", err);
         failResponse(res, err.message);
+        return Promise.reject(err);
       });
   }
 
@@ -88,6 +89,7 @@ class Processor {
       }, function(err) {
         error("error fetching image: %o", err);
         failResponse(res, err.message);
+        return Promise.reject(err);
       });
   }
 
@@ -135,6 +137,7 @@ class Processor {
       }, function(err) {
         error("error processing image: %o", err);
         failResponse(res, err.message);
+        return Promise.reject(err);
       });
   }
 
@@ -163,6 +166,7 @@ class Processor {
       catch(function(err) {
         failResponse(res, err.message);
         res.end();
+        return Promise.reject(err);
       });
   }
 
