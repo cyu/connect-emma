@@ -164,6 +164,7 @@ class Processor {
     res.writeHead(200, h);
     return this._pipeStream(stream, res).
       catch(function(err) {
+        error('error streaming image to response: %o', err);
         failResponse(res, err.message);
         res.end();
         return Promise.reject(err);
