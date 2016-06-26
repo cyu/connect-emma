@@ -63,19 +63,7 @@ class Processor {
     return this._getImage(context, res).
       then( (image) => this.processImage(image, context, res) ).
       then( (image) => this._streamImage(image, context, res) ).
-      then(function() {
-        if (context._cleanupFunctions) {
-          for (let i = 0, len = context._cleanupFunctions.length; i < len; i++) {
-            let func = context._cleanupFunctions[0];
-            log('performing cleanup: %o', func);
-            try {
-              func();
-            } catch (err) {
-              error('error in cleanup function: %o', err);
-            }
-          } 
-        }
-      });
+      then( () => this._cleanup(context) );
   }
 
   processImage(image, context, res) {
@@ -204,6 +192,22 @@ class Processor {
       a.pipe(b);
     });
   }
+
+  _cleanup(context) {
+    if (context._cleanupFunctions) {
+      for (let i = 0, len = context._cleanupFunctions.length; i < len; i++) {
+        let func = context._cleanupFunctions[0];
+        log('performing cleanup: %o', func);
+        try {
+          func();
+          log('cleanup completed');
+        } catch (err) {
+          error('error in cleanup function: %o', err);
+        }
+      }
+    }
+  }
+
 }
 
 module.exports = Processor;
