@@ -11,6 +11,18 @@ images.helper({
   facebookShareThumbResize: function(image) {
     // you can access context variables via this (this.params.filename)
     return image.gravity('Center').resize(470, 246);
+  },
+
+  size: function(image) {
+    return new Promise(function(resolve, reject) {
+      image.size({bufferStream: true}, function(err, size) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(size);
+        }
+      });
+    });
   }
 });
 images.process(
@@ -45,6 +57,16 @@ images.process(
     function(image, context) {
       return context.facebookShareThumbResize(image);
     });
+images.process(
+    "/cinemagraph/:filename",
+    imageUrlTemplate,
+    { gifFirstFrame: true },
+    function(image, context) {
+      return context.size(image).
+        then(function(size) {
+          return image.resize(size.width / 2, size.height / 2);
+        });
+    });
 
 app = connect().
   use(images.buildMiddleware()).
@@ -57,5 +79,6 @@ console.log('   http://localhost:' + port + '/test/lighthouse.jpg');
 console.log('   http://localhost:' + port + '/test/320/320/lighthouse.jpg');
 console.log('   http://localhost:' + port + '/test/crop/640/320/lighthouse.jpg');
 console.log('   http://localhost:' + port + '/facebook/lighthouse.jpg');
+console.log('   http://localhost:' + port + '/cinemagraph/animated_cinemagraph.gif');
 console.log('See the original image here: http://localhost:' + port + '/images/lighthouse.jpg');
 

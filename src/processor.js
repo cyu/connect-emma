@@ -42,9 +42,18 @@ class Processor {
 
     if ('cacheExpiration' in options) {
       this.cacheExpiration = options.cacheExpiration;
+    } else {
+      this.cacheExpiration = null;
     }
     if ('socketTimeout' in options) {
       this.socketTimeout = options.socketTimeout;
+    } else {
+      this.socketTimeout = null;
+    }
+    if ('gifFirstFrame' in options) {
+      this.gifFirstFrame = options.gifFirstFrame;
+    } else {
+      this.gifFirstFrame = false;
     }
   }
 
@@ -75,6 +84,7 @@ class Processor {
   }
 
   _getImage(context, res) {
+    let gifFirstFrame = this.gifFirstFrame;
     return this._requestImage(context).
       then(function(imageResponse) {
         if (imageResponse.statusCode != 200) {
@@ -84,7 +94,12 @@ class Processor {
           context.imageContentType = imageResponse.headers['content-type'];
           context.imageLastModified = imageResponse.headers['last-modified'];
           log("received image: %s", context.imageContentType);
-          return gm(imageResponse, path.basename(context.imageUrl));
+          let filename = path.basename(context.imageUrl);
+          if (gifFirstFrame && filename.match(/\.gif$/)) {
+            log('processing first frame of gif: %s', filename);
+            filename = filename + '[0]';
+          }
+          return gm(imageResponse, filename);
         }
       }, function(err) {
         error("error fetching image: %o", err);
