@@ -68,8 +68,12 @@ class Processor {
           for (let i = 0, len = context._cleanupFunctions.length; i < len; i++) {
             let func = context._cleanupFunctions[0];
             log('performing cleanup: %o', func);
-            func();
-          }
+            try {
+              func();
+            } catch (err) {
+              error('error in cleanup function: %o', err);
+            }
+          } 
         }
       });
   }
