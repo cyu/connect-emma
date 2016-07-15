@@ -35,9 +35,10 @@ function failResponse(res, message) {
 }
 
 class Processor {
-  constructor(route, imageSource, options, processFunc) {
+  constructor(route, imageSource, imageQueue, options, processFunc) {
     this.route = route;
     this.imageSource = imageSource;
+    this.imageQueue = imageQueue;
     this.processFunc = processFunc;
 
     if ('cacheExpiration' in options) {
@@ -101,20 +102,11 @@ class Processor {
   }
 
   _requestImage(context) {
-    log('requesting image...');
-    let proc = this;
-    let socketTimeout = this.socketTimeout;
-    return new Promise(function(resolve, reject) {
-      proc.imageSource.getImage(context, function(imageResponse) {
-        resolve(imageResponse);
-      }).on('error', function(err) {
-        reject(err);
-      }).on('socket', function(socket) {
-        if (socketTimeout) {
-          socket.setTimeout(socketTimeout);
-        }
-      });
-    });
+    return this.imageQueue.push(
+      this.imageSource,
+      context,
+      { socketTimeout: this.socketTimeout }
+    );
   }
 
   _executeProcessFunction(image, context) {

@@ -3,6 +3,7 @@
 import Processor from './processor';
 import Route from './route';
 import ImageSource from './image_source';
+import fetchImageQueue from './fetch_image_queue'
 import {log,error} from './utils';
 
 let contextHelpers = {
@@ -52,6 +53,14 @@ class Emma {
 
 class Builder {
   constructor() {
+    let options = {};
+    if (arguments.length > 0) {
+      options = arguments[0];
+    }
+
+    let imageWorkerCount = options.imageWorkerCount || 10;
+    this.imageQueue = fetchImageQueue(imageWorkerCount);
+
     this.processors = [];
     this.helpers = null;
   }
@@ -68,6 +77,7 @@ class Builder {
     let processor = new Processor(
         new Route(route),
         new ImageSource(urlTemplate),
+        this.imageQueue,
         processOptions,
         processFunc);
     this.processors.push(processor);
