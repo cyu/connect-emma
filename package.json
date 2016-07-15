@@ -1,6 +1,6 @@
 {
   "name": "connect-emma",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Connect middleware for proxying & transforming images",
   "main": "./lib/connect-emma.js",
   "scripts": {
