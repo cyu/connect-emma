@@ -62,12 +62,12 @@ class Processor {
     context.params = this.route.extractParameters(context.request);
     log('params: %o', context.params);
     return this._getImage(context, res).
-      then( (image) => this.processImage(image, context, res) ).
-      then( (image) => this._streamImage(image, context, res) ).
+      then( (image) => this._processImage(image, context, res) ).
+      then( (image) => this._writeImage(image, context, res) ).
       then( () => this._cleanup(context) );
   }
 
-  processImage(image, context, res) {
+  _processImage(image, context, res) {
     return this._executeProcessFunction(image, context).
       catch(function(err) {
         error("error in process function: %o", err);
@@ -78,7 +78,7 @@ class Processor {
 
   _getImage(context, res) {
     let gifFirstFrame = this.gifFirstFrame;
-    return this._requestImage(context).
+    return this.imageQueue.push(this.imageSource, context, {socketTimeout: this.socketTimeout}).
       then(function(imageResponse) {
         if (imageResponse.statusCode != 200) {
           handleFailedImageResponse(imageResponse, res);
@@ -101,14 +101,6 @@ class Processor {
       });
   }
 
-  _requestImage(context) {
-    return this.imageQueue.push(
-      this.imageSource,
-      context,
-      { socketTimeout: this.socketTimeout }
-    );
-  }
-
   _executeProcessFunction(image, context) {
     let promise = null;
     try {
@@ -125,6 +117,36 @@ class Processor {
       promise = Promise.reject(err);
     }
     return promise;
+  }
+
+  _bufferImage(image) {
+    return new Promise(function(resolve, reject) {
+      log("buffering final image...");
+      image.toBuffer(function(err, buf) {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(buf);
+        }
+      });
+    });
+  }
+
+  _writeImage(image, context, res) {
+    let proc = this;
+    return this._bufferImage(image).
+      then(function(buffer) {
+        log("writing image...");
+        context.imageFileSize = buffer.length;
+        proc._writeResponseHead(context, res);
+        res.write(buffer);
+        res.end();
+      }).
+      catch(function(err) {
+        error("error writing image: %o", err);
+        failResponse(res, err.message);
+        return Promise.reject(err);
+      });
   }
 
   _streamImage(image, context, res) {
@@ -152,15 +174,22 @@ class Processor {
     });
   }
 
-  _pipeStreamToResponse(stream, context, res) {
-    log('sending transformed image...');
+  _writeResponseHead(context, res) {
     let cacheExpiration = this.cacheExpiration;
     let h = headers(context.imageContentType, {'Last-Modified': context.imageLastModified});
     if (cacheExpiration) {
       h['Expires'] = dateHeaderValue(new Date(new Date().getTime() + (cacheExpiration*1000)));
       h['Cache-Control'] = "public, max-age=" + cacheExpiration;
     }
+    if (context.imageFileSize) {
+      h['Content-Length'] = context.imageFileSize;
+    }
     res.writeHead(200, h);
+  }
+
+  _pipeStreamToResponse(stream, context, res) {
+    log('sending transformed image...');
+    this._writeResponseHead(context, res);
     return this._pipeStream(stream, res).
       catch(function(err) {
         error('error streaming image to response: %o', err);
