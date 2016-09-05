@@ -88,6 +88,7 @@ class Processor {
           context.imageLastModified = imageResponse.headers['last-modified'];
           log("received image: %s", context.imageContentType);
           let filename = path.basename(context.imageUrl);
+          context.basename = filename;
           if (gifFirstFrame && filename.match(/\.gif$/)) {
             log('processing first frame of gif: %s', filename);
             filename = filename + '[0]';
